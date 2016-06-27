@@ -26,5 +26,9 @@
     "eslint-config-standard": "*",
     "eslint-plugin-promise": "*",
     "eslint-plugin-standard": "*"
+  },
+  "dependencies": {
+    "rxjs": "^5.0.0-beta.9",
+    "rxjs-es": "^5.0.0-beta.9"
   }
 }

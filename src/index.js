@@ -1,3 +1,5 @@
-import moda from './moduleA.js'
+import {Rx} from 'rxjs/Rx';
+import {Observable as Ob} from 'rxjs/Observable';
 
-alert(moda)
+Ob.of(1,2,3).subscribe(x=>console.log(x))
+
