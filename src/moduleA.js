@@ -1,1 +1,0 @@
-export default 'its working a'

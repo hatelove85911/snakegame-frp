@@ -3,7 +3,9 @@ import {Observable as Ob} from 'rxjs/Observable'
 import Subject from 'rxjs/Subject'
 import $ from 'jquery'
 
-const log = x=>console.log('log:', x)
+// const Ob = Rx.Observable
+
+const log = (msg, x)=>console.log(`${msg}: ${x}`)
 
 const start = document.querySelector('#start')
 const pauseOrCont = document.querySelector('#pauseOrCont')
@@ -35,15 +37,10 @@ const direction = {
 
 const levels = [{
   level: 1,
-  speed: 1000,
-  food: 10,
+  speed: 500,
+  food: 3,
   map: ['wwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
-       'w                            w',
-       'w                      w     w',
-       'w                      w     w',
-       'w                      w     w',
-       'w                      w     w',
-       'w                      w     w',
+       'w                           ww',
        'w                            w',
        'w                            w',
        'w                            w',
@@ -52,22 +49,27 @@ const levels = [{
        'w                            w',
        'w                            w',
        'w                            w',
-       'w                   wwwwww   w',
        'w                            w',
        'w                            w',
        'w                            w',
        'w                            w',
-       'w         wwww               w',
+       'w                            w',
+       'w                            w',
+       'w                            w',
+       'w                            w',
+       'w                            w',
+       'w                            w',
+       'w                            w',
        'w                            w',
        'w                            w',
        'w                            w',
        'wwwwwwwwwwwwwwwwwwwwwwwwwwwwww']
 }, {
   level: 2,
-  speed: 700,
-  food: 20,
+  speed: 250,
+  food: 5,
   map: ['wwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
-       'w                            w',
+       'w                          www',
        'w                            w',
        'w                            w',
        'w                            w',
@@ -93,10 +95,10 @@ const levels = [{
        'wwwwwwwwwwwwwwwwwwwwwwwwwwwwww']  
 }, {
   level: 3,
-  speed: 500,
-  food: 30,
+  speed: 100,
+  food: 6,
   map: ['wwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
-       'w                            w',
+       'w                         wwww',
        'w                            w',
        'w                            w',
        'w                            w',
@@ -138,13 +140,12 @@ const addPoint = (p1, p2) => ({
   x: p1.x + p2.x,
   y: p1.y + p2.y
 })
-
 const isPointEq = (p1, p2) => p1.x === p2.x && p1.y === p2.y
 
 
 const randomFood = ()=> ({
-  x: Math.floor(Math.random() * 26) + 1,
-  y: Math.floor(Math.random() * 26) + 1
+  x: Math.floor(Math.random() * 15) + 1,
+  y: Math.floor(Math.random() * 15) + 1
 })
 
 
@@ -202,20 +203,30 @@ const gameOn$ = gameStatus$.filter(s=> s===1)
 //************************************************
 // game interval stream
 //************************************************
-const gameInterval$ = gameOn$
-            .withLatestFrom(levelChange$, (xxx, level) => level)
+	
+const gameInterval$ = Ob.combineLatest(gameOn$, levelChange$, (xxx, level)=>level)
             .switchMap((level)=>Ob.interval(level.speed)
             .takeUntil(Ob.fromEvent(pauseOrCont, 'click'))).publish()
 
 const proxySnake$ = new Rx.Subject()
 const snake$ = Ob.of(initSnakePosition).merge(proxySnake$)
 
-const proxyFood$ = new Rx.Subject()
-const food$ = Ob.of(randomFood()).merge(proxyFood$)
+
+const generateFoodTiming$ = new Rx.Subject()
+const generateFood$ = Ob.merge(levelChange$, generateFoodTiming$)
+						.map(()=>{
+							return randomFood()
+						}).publish()
+
+const foodCount$ = levelChange$.map(level=>level.food).merge(generateFoodTiming$.mapTo('g'))
+					.scan((acc, curr)=> curr !== 'g' ? curr : --acc)
+
+foodCount$.filter(x=> x===0).subscribe(success$)
+
 
 const nextPosition$ = gameInterval$
             .withLatestFrom(move$, snake$, (i, direction, snake) => addPoint(direction, snake[0]))
-            .withLatestFrom(levelChange$, snake$, food$, (nextPos, level, snake, food) => {
+            .withLatestFrom(levelChange$, snake$, generateFood$, (nextPos, level, snake, food) => {
               let what = ''
               let nextBodyPositions = snake.slice()
               nextBodyPositions.pop()
@@ -223,17 +234,14 @@ const nextPosition$ = gameInterval$
               // check if it's wall
               if(level.map[nextPos.y][nextPos.x] === 'w') what = 'w'
               else if(nextBodyPositions.some(body=>isPointEq(body, nextPos))) what = 's'
-              else if(isPointEq(food, nextPos)) {
-                debugger
-                what = 'f'
-              }
+              else if(isPointEq(food, nextPos)) what = 'f'
               else what = 'e'
                
               return {
                 nextPos,
                 what
               }
-            })
+            }).publish()
 
 const moveToEmpty$ = nextPosition$.filter(nextPos=> nextPos.what === 'e')
             .withLatestFrom(snake$, (nextPos, snake)=>{
@@ -251,10 +259,7 @@ const moveToFood$ = nextPosition$.filter(nextPos=> nextPos.what === 'f')
             })
 
 Ob.merge(moveToEmpty$, moveToFood$).subscribe(proxySnake$)
-moveToFood$.map(()=>{
-  return randomFood()
-}).subscribe(proxyFood$)
-
+moveToFood$.subscribe(generateFoodTiming$)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // subscription
@@ -262,7 +267,7 @@ moveToFood$.map(()=>{
 levelChange$.subscribe(level=>{
   $('#level').text(level.level)
   $('#speed').text(level.speed)
-  $('#food').text(level.food)
+  // $('#food').text(level.food)
   $('#map').empty()
   level.map.map(row=>{
     let $row = $('<tr>')
@@ -283,17 +288,24 @@ gameStatus$.subscribe(x=> {
   else if(x === 1) statusText.innerHTML = 'Started'
   else if(x === 2) statusText.innerHTML = 'Paused'
 })
-gameInterval$.connect()
-levelChange$.connect()
 
 
-food$.subscribe(p=>{
+foodCount$.subscribe(count=>{
+	$('#foodleft').text(count)
+})
+
+generateFood$.subscribe(p=>{
 $('td').removeClass('food')  
 $('#map').children().eq(p.y).children().eq(p.x).addClass('food')
 })
-// gameInterval$.subscribe(x=>{
-//   timeleftText.innerHTML = x
-// })
+
+nextPosition$.connect()
+gameInterval$.connect()
+generateFood$.connect()
+levelChange$.connect()
+
+// these two subscription must stay below the levelchange$ connect because we need 
+// to have a map first, then we can draw snake and food on the map accordingly
 
 snake$.subscribe(s=>{
   $('td').removeClass('snake')
@@ -301,4 +313,7 @@ snake$.subscribe(s=>{
     $('tbody').children().eq(b.y).children().eq(b.x).addClass('snake')  
   })
 })
+
+
+
 
