@@ -1,2 +1,3 @@
-# es6seed
-es6 seed repository
+# snakegame-frp
+snakegame-frp
+

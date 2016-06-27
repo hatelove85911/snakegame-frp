@@ -1,0 +1,17 @@
+td.empty{
+  width: 20px;
+  height: 20px;
+  background-color: gray;
+}
+td.wall{
+  width: 20px;
+  height: 20px;
+  background-color: black;
+}
+td.snake {
+  background-color: red;
+}
+
+td.food {
+  background-color: yellow;
+}

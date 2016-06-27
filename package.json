@@ -28,6 +28,8 @@
     "eslint-plugin-standard": "*"
   },
   "dependencies": {
+    "jQuery": "^1.7.4",
+    "jquery": "^3.0.0",
     "rxjs": "^5.0.0-beta.9",
     "rxjs-es": "^5.0.0-beta.9"
   }
